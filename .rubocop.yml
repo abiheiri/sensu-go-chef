@@ -1,3 +1,4 @@
+---
 AllCops:
   TargetRubyVersion: 2.4
   Exclude:
@@ -7,3 +8,5 @@ Style/FrozenStringLiteralComment:
 Lint/AmbiguousRegexpLiteral:
   Exclude:
     - '**/test/**/*'
+ChefDeprecations/ChefSpecCoverageReport:
+  Enabled: false

@@ -1,8 +1,8 @@
 #
 # Cookbook:: sensu-go-chef
-# Resource:: agent
+# Resource:: ctl
 #
-# Copyright:: 2018 Sensu, Inc.
+# Copyright:: 2020 Sensu, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -24,6 +24,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 resource_name :sensu_ctl
+provides :sensu_ctl
 
 include SensuCookbook::SensuPackageProperties
 
@@ -32,21 +33,21 @@ property :password, String, default: 'P@ssw0rd!', sensitive: true
 property :backend_url, String, default: 'http://127.0.0.1:8080'
 # WARNING: this will expose secrets to whatever is capturing
 # the log output be it stdout (such as in CI) or log files
-property :debug, [TrueClass, FalseClass], default: false
+property :debug, [true, false], default: false
 
 action_class do
   include SensuCookbook::Helpers::SensuCtl
 end
 
-# load_current_value do
-#   cluster_file = '/root/.config/sensu/sensuctl/cluster'
-#   if ::File.exist?(cluster_file)
-#     backend_url JSON.parse(IO.read(cluster_file))['api-url']
-#   end
-# end
-
 action :install do
-  if node['platform'] != 'windows'
+  if platform?('windows')
+    include_recipe 'chocolatey'
+
+    chocolatey_package 'sensu-cli' do
+      action :install
+      version new_resource.version unless new_resource.version == 'latest'
+    end
+  else
     packagecloud_repo new_resource.repo do
       type value_for_platform_family(
         %w(rhel fedora amazon) => 'rpm',
@@ -59,68 +60,30 @@ action :install do
       version new_resource.version unless new_resource.version == 'latest'
     end
   end
-
-  if node['platform'] == 'windows'
-    # This is awaiting a packaged method to be delivered, but provides a resource currently.
-    include_recipe 'seven_zip'
-
-    directory 'c:\sensutemp'
-
-    powershell_script 'Download Sensuctl' do
-      code "Invoke-WebRequest https://s3-us-west-2.amazonaws.com/sensu.io/sensu-go/#{node['sensu-go']['ctl_version']}/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64.tar.gz  -OutFile c:/sensutemp/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64.tar.gz"
-      not_if "Test-Path c:/sensutemp/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64.tar.gz"
-    end
-
-    seven_zip_archive 'Extract Sensuctl Gz' do
-      path "c:/sensutemp/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64.tar"
-      source "c:/sensutemp/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64.tar.gz"
-      overwrite true
-      timeout   30
-    end
-
-    seven_zip_archive 'Extract Sensuctl Tar' do
-      path "c:/sensutemp/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64"
-      source "c:/sensutemp/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64.tar"
-      overwrite true
-      timeout   30
-    end
-
-    directory sensuctl_bin do
-      recursive true
-    end
-
-    remote_file "#{sensuctl_bin}\\sensuctl.exe" do
-      source "file:///c:/sensutemp/sensu-enterprise-go_#{node['sensu-go']['ctl_version']}_windows_amd64/sensuctl.exe"
-    end
-
-    windows_path sensuctl_bin
-
-    directory 'c:\sensutemp' do
-      action :delete
-      recursive true
-    end
-  end
 end
 
 action :configure do
   if shell_out('sensuctl user list').error?
     converge_by 'Reconfiguring sensuctl' do
-      execute 'configure sensuctl' do
-        command sensuctl_configure_cmd
-        sensitive true unless new_resource.debug
+      unless platform?('windows')
+        execute 'configure sensuctl' do
+          command sensuctl_configure_cmd
+          sensitive true unless new_resource.debug
+        end
+      end
+      if platform?('windows')
+        powershell_script 'configure sensuctl' do
+          code sensuctl_configure_cmd
+          sensitive true unless new_resource.debug
+        end
       end
     end
   end
 end
 
-action :uninstall do
-  if node['platform'] != 'windows'
-    package 'sensu-go-cli' do
-      action :remove
-    end
-  end
-
-  if node['platform'] == 'windows'
+# This removes the folder we were previously putting the binary into.
+action :cleanup_legacy_cookbook_install do
+  if platform?('windows')
     windows_path sensuctl_bin do
       action :remove
     end
@@ -128,6 +91,18 @@ action :uninstall do
     directory sensuctl_bin do
       action :delete
       recursive true
+    end
+  end
+end
+
+action :uninstall do
+  if platform?('windows')
+    chocolatey_package 'sensu-cli' do
+      action :remove
+    end
+  else
+    package 'sensu-go-cli' do
+      action :remove
     end
   end
 end

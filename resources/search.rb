@@ -1,6 +1,6 @@
 #
 # Cookbook:: sensu-go
-# Resource:: role
+# Resource:: search
 #
 # Copyright:: 2020 Sensu, Inc.
 #
@@ -26,47 +26,48 @@
 include SensuCookbook::SensuMetadataProperties
 include SensuCookbook::SensuCommonProperties
 
-resource_name :sensu_role
-provides :sensu_role
+resource_name :sensu_search
+provides :sensu_search
 
 property :namespace, String, default: 'default'
-# rubocop:disable Style/TrailingCommaInHashLiteral
-property :rules, Array, required: true, callbacks: {
-  'should be an array of hashes' => lambda do |arry|
+property :parameters, Array, required: true, callbacks: {
+  'List can only contain valid sensu search parameters' => lambda do |arry|
     arry.all? do |e|
-      e.respond_to?(:keys)
+      e.start_with?('action', 'check', 'class',
+                    'entity', 'event', 'label', 'published',
+                    'silenced', 'status', 'subscription', 'type')
     end
-  end
-}
-# rubocop:enable Style/TrailingCommaInHashLiteral
+  end,
+         }
+property :resource, String, required: true
 
 action_class do
   include SensuCookbook::Helpers
 end
 
 action :create do
-  directory object_dir do
+  directory object_dir(plural = false) do
     action :create
     recursive true
   end
 
-  file object_file do
-    content JSON.generate(role_from_resource)
-    notifies :run, "execute[sensuctl create -f #{object_file}]"
+  file object_file(plural = false) do
+    content JSON.generate(search_from_resource)
+    notifies :run, "execute[sensuctl create -f #{object_file(plural = false)}]"
   end
 
-  execute "sensuctl create -f #{object_file}" do
+  execute "sensuctl create -f #{object_file(plural = false)}" do
     action :nothing
   end
 end
 
 action :delete do
-  file object_file do
-    action :delete
-    notifies :run, "execute[sensu role delete #{new_resource.name} --skip-confirm"
+  execute "sensuctl delete -f #{object_file(plural = false)}" do
+    action :run
+    notifies :delete, "file[#{object_file(plural = false)}]"
   end
 
-  execute "sensuctl role delete #{new_resource.name} --skip-confirm" do
+  file object_file(plural = false) do
     action :nothing
   end
 end

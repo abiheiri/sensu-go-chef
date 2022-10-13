@@ -2,7 +2,7 @@
 # Cookbook:: sensu-go
 # Resource:: filter
 #
-# Copyright:: 2018 Sensu, Inc.
+# Copyright:: 2020 Sensu, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,11 +27,14 @@ include SensuCookbook::SensuMetadataProperties
 include SensuCookbook::SensuCommonProperties
 
 resource_name :sensu_filter
+provides :sensu_filter
+provides :sensu_go_filter
 
 property :filter_action, String, equal_to: %w(allow deny), required: true
 property :expressions, Array, required: true
 property :when, Hash
 property :runtime_assets, Array
+property :namespace, String, default: 'default'
 
 action_class do
   include SensuCookbook::Helpers

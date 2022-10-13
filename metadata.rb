@@ -3,10 +3,9 @@ maintainer 'Sensu Community'
 maintainer_email 'support@sensuapp.com'
 license 'MIT'
 description 'Installs/Configures Sensu Go'
-long_description IO.read(File.join(File.dirname(__FILE__), 'README.md'))
-version '0.1.0'
+version '1.4.0'
 
-chef_version '>= 12.5'
+chef_version '>= 15.0'
 
 %w(
   aix
@@ -28,4 +27,4 @@ issues_url 'https://github.com/sensu/sensu-go-chef/issues'
 source_url 'https://github.com/sensu/sensu-go-chef'
 
 depends 'packagecloud'
-depends 'seven_zip'
+depends 'chocolatey'

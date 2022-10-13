@@ -2,7 +2,7 @@
 # Cookbook:: sensu-go
 # Resource:: asset
 #
-# Copyright:: 2018 Sensu, Inc.
+# Copyright:: 2020 Sensu, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,28 +27,59 @@ include SensuCookbook::SensuMetadataProperties
 include SensuCookbook::SensuCommonProperties
 
 resource_name :sensu_asset
+provides :sensu_asset
+provides :sensu_go_asset
 
 property :filters, Array
-property :sha512, String, required: true
-property :url, String, required: true
+property :sha512, String, required: false
+property :url, String, required: false
+property :builds, Array, default: [], required: false, callbacks: {
+  'should be an array of hashes' => lambda do |arry|
+    arry.all? do |e|
+      e.respond_to?(:keys)
+    end
+  end,
+
+  'each build should contain sha512 and url' => lambda do |arry|
+    arry.all? do |e|
+      e.key?('url') && e.key?('sha512')
+    end
+  end,
+
+  'build filters should be an array' => lambda do |arry|
+    arry.all? do |e|
+      if e.key?('filters')
+        e['filters'].is_a?(Array)
+      else
+        true
+      end
+    end
+  end,
+}
+property :namespace, String, default: 'default'
+property :headers, Hash, default: {}
 
 action_class do
   include SensuCookbook::Helpers
 end
 
 action :create do
-  directory object_dir do
-    action :create
-    recursive true
-  end
+  if !property_is_set?(:url) && !property_is_set?(:sha512) && new_resource.builds.empty?
+    raise Chef::Exceptions::ValidationFailed
+  else
+    directory object_dir do
+      action :create
+      recursive true
+    end
 
-  file object_file do
-    content JSON.generate(asset_from_resource)
-    notifies :run, "execute[sensuctl create -f #{object_file}]"
-  end
+    file object_file do
+      content JSON.generate(asset_from_resource)
+      notifies :run, "execute[sensuctl create -f #{object_file}]"
+    end
 
-  execute "sensuctl create -f #{object_file}" do
-    action :nothing
+    execute "sensuctl create -f #{object_file}" do
+      action :nothing
+    end
   end
 end
 

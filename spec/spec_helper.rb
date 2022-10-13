@@ -3,4 +3,5 @@ require 'chefspec/berkshelf'
 
 require_relative 'support/platforms'
 
-at_exit { ChefSpec::Coverage.report! }
+# TODO: Cookstyle error: ChefDeprecations/ChefSpecCoverageReport: Don't use the deprecated ChefSpec coverage report functionality in your specs.
+# at_exit { ChefSpec::Coverage.report! }

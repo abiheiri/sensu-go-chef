@@ -1,6 +1,6 @@
 #
 # Cookbook:: sensu-go
-# Resource:: role
+# Resource:: active_directory
 #
 # Copyright:: 2020 Sensu, Inc.
 #
@@ -26,47 +26,34 @@
 include SensuCookbook::SensuMetadataProperties
 include SensuCookbook::SensuCommonProperties
 
-resource_name :sensu_role
-provides :sensu_role
-
-property :namespace, String, default: 'default'
-# rubocop:disable Style/TrailingCommaInHashLiteral
-property :rules, Array, required: true, callbacks: {
-  'should be an array of hashes' => lambda do |arry|
-    arry.all? do |e|
-      e.respond_to?(:keys)
-    end
-  end
-}
-# rubocop:enable Style/TrailingCommaInHashLiteral
+resource_name :sensu_active_directory
+provides :sensu_active_directory
 
 action_class do
   include SensuCookbook::Helpers
 end
 
+property :auth_servers, Array, required: true
+property :groups_prefix, String
+property :username_prefix, String
+property :resource_type, String, default: 'ad'
+alias_method :servers, :auth_servers
+
+# maintain backward compat with released cookbook versions for now, but warn users
+deprecated_property_alias 'ad_servers', 'servers', 'ad_servers property was renamed to servers in v1.3.0 release of this cookbook. Please update recipes to use the new property name.'
+
 action :create do
-  directory object_dir do
+  directory object_dir(false) do
     action :create
     recursive true
   end
 
-  file object_file do
-    content JSON.generate(role_from_resource)
-    notifies :run, "execute[sensuctl create -f #{object_file}]"
+  file object_file(false) do
+    content JSON.generate(active_directory_from_resource)
+    notifies :run, "execute[sensuctl create -f #{object_file(false)}]"
   end
 
-  execute "sensuctl create -f #{object_file}" do
-    action :nothing
-  end
-end
-
-action :delete do
-  file object_file do
-    action :delete
-    notifies :run, "execute[sensu role delete #{new_resource.name} --skip-confirm"
-  end
-
-  execute "sensuctl role delete #{new_resource.name} --skip-confirm" do
+  execute "sensuctl create -f #{object_file(false)}" do
     action :nothing
   end
 end

@@ -24,6 +24,7 @@
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 resource_name :sensu_agent
+provides :sensu_agent
 
 include SensuCookbook::Helpers
 include SensuCookbook::SensuPackageProperties
@@ -35,8 +36,32 @@ property :config, Hash, default: { "name": node['hostname'],
                                    "backend-url": ['ws://127.0.0.1:8081'],
                                  }
 action :install do
+  if platform?('windows')
+    include_recipe 'chocolatey'
+    chocolatey_package 'sensu-agent' do
+      action :install
+      version new_resource.version unless new_resource.version == 'latest'
+    end
+
+    # render template at c:\Programdata\Sensu\config\agent.yml for windows
+    file ::File.join('c:/ProgramData/Sensu/config/', 'agent.yml') do
+      content(YAML.dump(JSON.parse(new_resource.config.to_json)).to_s)
+      notifies :restart, 'windows_service[SensuAgent]', :delayed
+    end
+
+    # Installs SensuAgent Service
+    powershell_script 'SensuAgent Service' do
+      code '.\\sensu-agent.exe service install'
+      cwd node['sensu-go']['sensu_bindir']
+      not_if '((Get-Service SensuAgent).Name -eq "SensuAgent")'
+    end
+
+    # Enable and start SensuAgent service
+    windows_service 'SensuAgent' do
+      action [:enable, :start]
+    end
   # Linux installation - source package
-  if node['platform'] != 'windows'
+  else
     packagecloud_repo new_resource.repo do
       type value_for_platform_family(
         %w(rhel fedora amazon) => 'rpm',
@@ -52,16 +77,22 @@ action :install do
         version new_resource.version
         action :install
       end
+      notifies :reload, 'systemd_unit[sensu-agent]', :immediately
+    end
+
+    systemd_unit 'sensu-agent' do
+      action :nothing
     end
 
     # render template at /etc/sensu/agent.yml for linux
     file ::File.join(new_resource.config_home, 'agent.yml') do
-      content(JSON.parse(new_resource.config.to_json).to_yaml.to_s)
+      content(YAML.dump(JSON.parse(new_resource.config.to_json)).to_s)
+      notifies :restart, 'service[sensu-agent]', :delayed
     end
 
     # Enable and start the sensu-agent service
     service 'sensu-agent' do
-      if node['platform'] == 'ubuntu' && node['platform_version'].to_f == 14.04
+      if platform?('ubuntu') && node['platform_version'].to_f == 14.04
         provider Chef::Provider::Service::Init
         action :start
       else
@@ -69,58 +100,29 @@ action :install do
       end
     end
   end
-
-  # Installs msi for Sensu-Go
-  if node['platform'] == 'windows'
-    windows_package 'sensu-go-agent' do
-      source node['sensu-go']['windows_msi_source']
-      installer_type :custom
-      version node['sensu-go']['msi_version']
-    end
-
-    # Adds install directory to path
-    windows_path node['sensu-go']['sensu_bindir']
-
-    # render template at c:\Programdata\Sensu\config\agent.yml for windows
-    file ::File.join('c:/ProgramData/Sensu/config/', 'agent.yml') do
-      content(JSON.parse(new_resource.config.to_json).to_yaml.to_s)
-    end
-
-    # Installs SensuAgent Service
-    powershell_script 'SensuAgent Service' do
-      code '.\\sensu-agent.exe service install'
-      cwd node['sensu-go']['sensu_bindir']
-      not_if '((Get-Service SensuAgent).Name -eq "SensuAgent")'
-    end
-
-    # Enable and start SensuAgent service
-    service 'SensuAgent' do
-      action [:enable, :start]
-    end
-  end
 end
 
 action :uninstall do
-  if node['platform'] != 'windows'
+  if platform?('windows')
+    windows_service 'SensuAgent' do
+      action :stop
+    end
+    # Removes SensuAgent Service
+    powershell_script 'SensuAgent Service' do
+      code '.\\sensu-agent.exe service uninstall'
+      cwd node['sensu-go']['sensu_bindir']
+      only_if '((Get-Service SensuAgent).Name -eq "SensuAgent")'
+    end
+
+    chocolatey_package 'sensu-agent' do
+      action :remove
+    end
+  else
     service 'sensu-agent' do
       action [:disable, :stop]
     end
 
     package 'sensu-go-agent' do
-      action :remove
-    end
-  end
-
-  if node['platform'] == 'windows'
-    windows_service 'SensuAgent' do
-      action [:stop, :delete]
-    end
-
-    registry_key 'HKLM\\SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\SensuAgent' do
-      action :delete_key
-    end
-
-    windows_package 'Sensu Agent' do
       action :remove
     end
   end

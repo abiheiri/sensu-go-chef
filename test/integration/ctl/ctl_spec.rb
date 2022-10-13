@@ -1,5 +1,5 @@
 #
-# Cookbook Name:: sensu-go
+# Cookbook:: sensu-go
 # Spec:: ctl
 #
 # Copyright:: 2018, The Authors, All Rights Reserved.
@@ -23,19 +23,24 @@ if os.linux?
   describe package('sensu-go-cli') do
     it { should be_installed }
   end
+
+  describe command('sensuctl user list') do
+    its('stdout') { should match /Username/ }
+    its('exit_status') { should eq 0 }
+  end
 end
 
 if os.windows?
-  describe command('cmd.exe /c "echo %PATH%"') do
-    its('stdout') { should include 'c:\Program Files\Sensu\sensu-cli\bin\sensuctl' }
+  describe os_env('PATH', 'system') do
+    its('split') { should include 'C:\Program Files\Sensu\sensu-cli\\\\bin' }
   end
 
-  describe file('c:\Program Files\Sensu\sensu-cli\bin\sensuctl\sensuctl.exe') do
-    it { should exist }
+  describe chocolatey_package('sensu-cli') do
+    it { should be_installed }
   end
-end
 
-describe command('sensuctl user list') do
-  its('stdout') { should match /Username/ }
-  its('exit_status') { should eq 0 }
+  describe command('sensuctl entity list') do
+    its('stdout') { should match /backend/ }
+    its('exit_status') { should eq 0 }
+  end
 end

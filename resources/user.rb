@@ -1,8 +1,8 @@
 #
 # Cookbook:: sensu-go
-# Resource:: role
+# Resource:: user
 #
-# Copyright:: 2020 Sensu, Inc.
+# Copyright:: 2019 Sensu, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -23,22 +23,16 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 # WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-include SensuCookbook::SensuMetadataProperties
+resource_name :sensu_user
+provides :sensu_user
+
+include SensuCookbook::Helpers::SensuCtl
 include SensuCookbook::SensuCommonProperties
 
-resource_name :sensu_role
-provides :sensu_role
-
-property :namespace, String, default: 'default'
-# rubocop:disable Style/TrailingCommaInHashLiteral
-property :rules, Array, required: true, callbacks: {
-  'should be an array of hashes' => lambda do |arry|
-    arry.all? do |e|
-      e.respond_to?(:keys)
-    end
-  end
-}
-# rubocop:enable Style/TrailingCommaInHashLiteral
+property :username, String, name_property: true
+property :password_hash, String, required: true, sensitive: true
+property :groups, Array, default: %w(view)
+property :disabled, [true, false], default: false
 
 action_class do
   include SensuCookbook::Helpers
@@ -51,22 +45,11 @@ action :create do
   end
 
   file object_file do
-    content JSON.generate(role_from_resource)
+    content JSON.generate(user_from_resource)
     notifies :run, "execute[sensuctl create -f #{object_file}]"
   end
 
   execute "sensuctl create -f #{object_file}" do
-    action :nothing
-  end
-end
-
-action :delete do
-  file object_file do
-    action :delete
-    notifies :run, "execute[sensu role delete #{new_resource.name} --skip-confirm"
-  end
-
-  execute "sensuctl role delete #{new_resource.name} --skip-confirm" do
     action :nothing
   end
 end

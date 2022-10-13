@@ -1,8 +1,8 @@
 #
 # Cookbook:: sensu-go
-# Resource:: filter
+# Resource:: hook
 #
-# Copyright:: 2019 Sensu, Inc.
+# Copyright:: 2020 Sensu, Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining
 # a copy of this software and associated documentation files (the
@@ -27,10 +27,12 @@ include SensuCookbook::SensuMetadataProperties
 include SensuCookbook::SensuCommonProperties
 
 resource_name :sensu_hook
+provides :sensu_hook
 
 property :command, String, required: true
 property :timeout, Integer
 property :stdin, [true, false]
+property :namespace, String, default: 'default'
 
 action_class do
   include SensuCookbook::Helpers

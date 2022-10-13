@@ -4,21 +4,21 @@ driver:
 
 provisioner:
   name: chef_zero
-  client_rb:
-    chef_license: accept
+  deprecations_as_errors: false
+  chef_license: accept-no-persist
 
 verifier:
   name: inspec
 
 platforms:
-  - name: ubuntu-14.04
   - name: ubuntu-16.04
   - name: ubuntu-18.04
+  - name: ubuntu-20.04
   - name: centos-6
   - name: centos-7
   - name: windows-2012r2
     driver:
-      box: tas50/windows_2012r2  
+      box: tas50/windows_2012r2
   - name: windows-2016
     driver:
       box: tas50/windows_2016
@@ -35,14 +35,17 @@ suites:
     run_list:
       - recipe[sensu_test::default]
       - recipe[sensu_test::postgres]
-    driver:  
-      network:
-        - ["private_network", {ip: "172.128.10.2"}]
+      - recipe[sensu_test::ctl]
     verifier:
       inspec_tests:
         - test/integration/default
         - test/integration/postgres
+        - test/integration/ctl
     attributes:
+      username: admin
+      password: password
+    driver:
+      network:
     excludes:
       - windows-2012r2
       - windows-2016
@@ -53,14 +56,4 @@ suites:
     verifier:
       inspec_tests:
         - test/integration/agent
-    attributes:
-  - name: ctl
-    run_list:
-      - recipe[sensu_test::ctl]
-    driver:  
-      network:
-        - ["private_network", {ip: "172.128.10.3", autocorrect: true}]
-    verifier:
-      inspec_tests:
-        - test/integration/ctl
     attributes:

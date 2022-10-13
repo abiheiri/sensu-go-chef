@@ -11,29 +11,33 @@ RSpec.shared_context 'common_stubs' do
     stub_command("((Get-Service SensuAgent).Name -eq \"SensuAgent\")") # rubocop:disable Style/StringLiterals
     stubs_for_provider('sensu_ctl[default]') do |provider|
       allow(provider).to receive_shell_out('sensuctl user list')
+      allow(provider).to receive_shell_out('sensuctl version').and_return(double(run_command: nil, error!: nil, stdout: 'sensuctl version 0.0.0', stderr: '', exitstatus: 0, live_stream: '')) # Windows check if Sensuctl is installed
     end
-    stub_command("Test-Path c:/sensutemp/sensu-enterprise-go_5.11.1_windows_amd64.tar.gz").and_return(true) # rubocop:disable Style/StringLiterals
+    stubs_for_resource('powershell_script[Install Chocolatey]') do |resource|
+      allow(resource).to receive_shell_out("powershell.exe -NoLogo -NonInteractive -NoProfile -ExecutionPolicy Unrestricted -InputFormat None -Command \"[System.Environment]::GetEnvironmentVariable('ChocolateyInstall', 'MACHINE')\"")
+    end
+    stub_command("Test-Path c:/sensutemp/sensu-go_6.1.0_windows_amd64.tar.gz").and_return(true) # rubocop:disable Style/StringLiterals
   end
 end
 
-RSpec.shared_context 'ubuntu-14.04' do
+RSpec.shared_context 'ubuntu-18.04' do
   cached(:chef_run) do
     ChefSpec::SoloRunner.new(
       os: 'linux',
       platform: 'ubuntu',
-      version: '14.04',
+      version: '18.04',
       file_cache_path: '/var/chef/cache'
     ).converge(described_recipe)
   end
   include_context 'common_stubs'
 end
 
-RSpec.shared_context 'ubuntu-16.04' do
+RSpec.shared_context 'ubuntu-20.04' do
   cached(:chef_run) do
     ChefSpec::SoloRunner.new(
       os: 'linux',
       platform: 'ubuntu',
-      version: '16.04',
+      version: '20.04',
       file_cache_path: '/var/chef/cache'
     ).converge(described_recipe)
   end
@@ -45,7 +49,7 @@ RSpec.shared_context 'centos-7' do
     ChefSpec::SoloRunner.new(
       os: 'linux',
       platform: 'centos',
-      version: '7.6.1804',
+      version: '7.8.2003',
       file_cache_path: '/var/chef/cache'
     ).converge(described_recipe)
   end
